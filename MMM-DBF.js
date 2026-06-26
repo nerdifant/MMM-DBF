@@ -76,18 +76,28 @@ Module.register("MMM-DBF", {
     const urlApi = `${this.gennerateUrl()}&mode=json&version=3`;
     const dataRequest = await fetch(urlApi);
 
-    if (!dataRequest.ok) {
-      let message = `An error has occured: ${dataRequest.status}`;
-      if (dataRequest.status === 300) {
-        message += " - Ambiguous station name.";
+    try {
+      if (!dataRequest.ok) {
+        let message = `An error has occured: ${dataRequest.status}`;
+        if (dataRequest.status === 300) {
+          message += " - Ambiguous station name.";
+        }
+        throw new Error(message);
       }
-      throw new Error(message);
+      else {
+        const data = await dataRequest.json();
+        self.processData(data);
+      }
     }
-    else {
-      const data = await dataRequest.json();
-      self.processData(data);
+    catch (error) {
+      Log.error(`[MMM-DBF] ${error.message}`);
+      this.errorMessage = error.message;
+      this.dataRequest = null;
+      this.updateDom(this.config.animationSpeed);
     }
-    self.scheduleUpdate(self.config.retryDelay);
+    finally {
+      this.scheduleUpdate(this.config.retryDelay);
+    }
   },
 
   /**
@@ -115,7 +125,9 @@ Module.register("MMM-DBF", {
    * @returns {HTMLIframeElement}
    */
   getDom() {
-    if (this.config.showApp) {
+    if (this.errorMessage) {
+      return this._getErrorMessageDiv(this.errorMessage);
+    } else if (this.config.showApp) {
       const iframe = document.createElement("IFRAME");
       iframe.style = "border:0";
       iframe.width = this.config.width;
@@ -137,6 +149,7 @@ Module.register("MMM-DBF", {
       }
       else {
         Log.error(this.dataRequest.error);
+        return this._getErrorMessageDiv(this.dataRequest.error);
       }
     }
     return tableWrapper;
@@ -280,7 +293,7 @@ Module.register("MMM-DBF", {
 
   /**
   * @description Check cancelled exist
-  * @param {Object[]} departures 
+  * @param {Object[]} departures
   */
   checkCancelledExist: function (departures) {
     for (let index = 0; index < this.getSize(departures); index++) {
@@ -295,6 +308,23 @@ Module.register("MMM-DBF", {
     }
     return false;
   },
+
+  /**
+   * This helper encapsulates the visual appearance logic found in getDom().
+   * @param {string} message The core error message to display.
+   * @returns {HTMLElement|null} The generated error div or null if no message is provided.
+   */
+  _getErrorMessageDiv(message) {
+    if (!message) return null;
+
+    const errorDiv = document.createElement("div");
+    errorDiv.className = "bright";
+    errorDiv.style.color = "#ff5555";
+    errorDiv.style.padding = "10px";
+    // We use the passed message as the primary source for display content.
+    errorDiv.innerHTML = `<b>DBF Fehler</b><br>${message}`;
+  return errorDiv;
+},
 
   /**
    * @description Creates the header for the Table
