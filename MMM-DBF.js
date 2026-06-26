@@ -72,11 +72,10 @@ Module.register("MMM-DBF", {
    * @description Gets data from dbf.finalrewind.org
    */
   async getData() {
-    const self = this;
-    const urlApi = `${this.gennerateUrl()}&mode=json&version=3`;
-    const dataRequest = await fetch(urlApi);
-
     try {
+      const urlApi = `${this.gennerateUrl()}&mode=json&version=3`;
+      const dataRequest = await fetch(urlApi, {cache: "no-store"});
+
       if (!dataRequest.ok) {
         let message = `An error has occured: ${dataRequest.status}`;
         if (dataRequest.status === 300) {
@@ -84,10 +83,10 @@ Module.register("MMM-DBF", {
         }
         throw new Error(message);
       }
-      else {
-        const data = await dataRequest.json();
-        self.processData(data);
-      }
+
+      const data = await dataRequest.json();
+      this.errorMessage = null;
+      this.processData(data);
     }
     catch (error) {
       Log.error(`[MMM-DBF] ${error.message}`);
@@ -105,13 +104,12 @@ Module.register("MMM-DBF", {
    * @param {int} delay - Milliseconds before next update.
    */
   scheduleUpdate(delay) {
-    const self = this;
     let nextLoad = this.config.updateInterval;
     if (typeof delay !== "undefined" && delay >= 0) {
       nextLoad = delay;
     }
     setTimeout(() => {
-      self.getData();
+      this.getData();
     }, nextLoad);
 
     if (!this.config.showApp) {
